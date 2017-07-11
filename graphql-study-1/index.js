@@ -4,6 +4,8 @@ const fs = require('fs');
 const express = require('express');
 const app = express();
 
+process.on('uncaughtException', (err) => console.log(err));
+
 let schema = buildSchema(`
 	type Query {
 		people: [Person],
@@ -30,33 +32,33 @@ let schema = buildSchema(`
 	}
 `);
 
-// 어제 재원쌤이 오셨을 때 
-
-let Person = (name, job, age = 10) => ({
+let Person = (name, job, fList, age) => ({
 	name,
-	job() {
+	job(args, ctx, {rootValue: people}) {
 		return `job is ${job}.`;
 	},
-	age
+	age,
+	friends(args, ctx, {rootValue: {people}}) {
+		return fList.map(fIdx => {
+			return people.find(person => {
+				return person.id == fIdx;
+			});
+		});
+	}
 });
 
 let people = ([
-	Person('john', 'programmer'),
-	Person('carly', 'designer'),
-	Person('trumph', 'president'),
-	Person('tom', 'shipper'),
-	Person('tony start', 'Iron man'),
-	Person('Steve', 'Captain America'),
-	Person('Peter', 'Spider man')
+	Person('colson', 'shield', [1, 2], 40),
+	Person('tony start', 'Iron man', [0, 2, 3], 50),
+	Person('Steve', 'Captain America', [0, 1], 80),
+	Person('Peter', 'Spider man', [1], 15)
 ]).map((person, idx) => {
 	person.id = idx;
 	return person;
 });
 
 let rootValue = {
-	people: () => {
-		return people;
-	},
+	people,
 	person: ({id}) => people.find((person) => {
 		return String(person.id) === id;
 	}),
@@ -70,6 +72,24 @@ let rootValue = {
 		return person;
 	}
 };
+
+let request = `
+query {
+	people {
+		friends {
+			id
+		}
+	}
+}
+`;
+
+// graphql(schema, request, rootValue).then(({error, data}) => {
+// 	if (error) {
+// 		console.log(error);
+// 	} else {
+// 		console.log(data.people);
+// 	}
+// }).catch(err => console.log(err));
 
 app.use('/graphql', graphqlHTTP({
 	schema,

@@ -75,10 +75,12 @@ const Movie = database.define('movie', {
 		primaryKey: true
 	},
 	title: {
-		type: Sequelize.STRING
+		type: Sequelize.STRING,
+		unique: 'movie'
 	},
 	year: {
 		type: Sequelize.INTEGER,
+		unique: 'movie',
 		defaultValue: 2008
 	}
 }, {

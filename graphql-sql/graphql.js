@@ -8,25 +8,16 @@ const { Character: CharacterModel, Movie: MovieModel } = models;
 // graphql 스키마 정리
 // =========================================================
 const graphql = require('graphql');
-const joinMonster = require('join-monster').default;
+const promisify = require('./modules/promisify');
+const joinMonster = promisify(require('join-monster').default);
 const {
 	GraphQLSchema,
 	GraphQLObjectType,
 	GraphQLInt,
 	GraphQLString,
-	GraphQLList
+	GraphQLList,
+	GraphQLEnumType,
 } = graphql;
-
-const Movie = new GraphQLObjectType({
-	name: 'movie',
-	fields() {
-		return {
-			id: { type: GraphQLInt },
-			title: { type: GraphQLString },
-			year: { type: GraphQLInt }
-		}
-	}
-});
 
 const Character = new GraphQLObjectType({
 	name: 'character',
@@ -43,6 +34,31 @@ const Character = new GraphQLObjectType({
 				}
 			}
 		};
+	}
+});
+
+const Movie = new GraphQLObjectType({
+	name: 'movie',
+	sqlTable: 'movies',
+	uniqueKey: 'id',
+	fields() {
+		return {
+			id: {
+				type: GraphQLInt
+			},
+			title: {
+				type: GraphQLString
+			},
+			year: {
+				type: GraphQLInt
+			},
+			character: {
+				type: Character,
+				resolve(movie) {
+					return movie.getCharacter();
+				}
+			}
+		}
 	}
 });
 
@@ -70,12 +86,7 @@ const query = new GraphQLObjectType({
 			movies: {
 				type: new GraphQLList(Movie),
 				resolve(root, args, context, resolveInfo) {
-					console.log('조인몬스터 실행');
-					joinMonster(resolveInfo, {}, (sql) => {
-						console.log('해석완료:', sql);
-					});
-					return [];
-					// return MovieModel.findAll();
+					return MovieModel.findAll();
 				}
 			},
 			movie: {
@@ -97,7 +108,7 @@ const mutation = new GraphQLObjectType({
 	name: 'Mutation',
 	fields() {
 		return {
-			createCharacter: {
+			insertCharacter: {
 				type: Character,
 				args: {
 					name: {type: GraphQLString},
@@ -106,9 +117,25 @@ const mutation = new GraphQLObjectType({
 				},
 				resolve(root, value) {
 					return CharacterModel.create(value).catch((err) => {
-						console.log('graphql 뮤테이션 에러');
+						console.log('character 뮤테이션 에러');
 						console.log(err);
 						return CharacterModel.find({
+							where: value
+						});
+					});
+				}
+			},
+			insertMovie: {
+				type: Movie,
+				args: {
+					title: { type: GraphQLString },
+					year: { type: GraphQLInt }
+				},
+				resolve(root, value) {
+					return MovieModel.create(value).catch((err) => {
+						console.log('movie 뮤테이션 에러');
+						console.log(err);
+						return MovieModel.find({
 							where: value
 						});
 					});

@@ -17,6 +17,7 @@ const {
 	GraphQLString,
 	GraphQLList,
 	GraphQLEnumType,
+	graphql: graphqlPromise
 } = graphql;
 
 const Character = new GraphQLObjectType({
@@ -30,7 +31,11 @@ const Character = new GraphQLObjectType({
 			movie: {
 				type: new GraphQLList(Movie),
 				resolve(character) {
-					return character.getMovies();
+					if (character.movies) {
+						return character.movies;
+					} else {
+						return character.getMovies();
+					}
 				}
 			}
 		};
@@ -62,14 +67,33 @@ const Movie = new GraphQLObjectType({
 	}
 });
 
+// queryName의 쿼리에서 fieldName을 가져올시에 join을 사용할 지를 정하는 함수
+let responseNeedJoin = (queryName, fieldName, resolveInfo, model) => {
+	let schemaResolveInfo = resolveInfo.operation.selectionSet.selections.find((field) => field.name.value === queryName),
+	includeJoinModel = false;
+	if (schemaResolveInfo) {
+		let querys = schemaResolveInfo.selectionSet.selections.map((selection) => selection.name.value);
+		includeJoinModel = querys.includes(fieldName);
+	}
+	if (includeJoinModel) {
+		return model ? [model] : true;
+	} else {
+		return model ? [] : false;
+	}
+}
+
 const query = new GraphQLObjectType({
 	name: 'Query',
 	fields() {
 		return {
 			characters: {
 				type: new GraphQLList(Character),
-				resolve(root) {
-					return CharacterModel.findAll();
+				resolve(root, args, context, resolveInfo) {
+					let include = [];
+					include = include.concat(responseNeedJoin('characters', 'movie', resolveInfo, MovieModel));
+					return CharacterModel.findAll({
+						include
+					});
 				}
 			},
 			character: {
@@ -117,8 +141,6 @@ const mutation = new GraphQLObjectType({
 				},
 				resolve(root, value) {
 					return CharacterModel.create(value).catch((err) => {
-						console.log('character 뮤테이션 에러');
-						console.log(err);
 						return CharacterModel.find({
 							where: value
 						});

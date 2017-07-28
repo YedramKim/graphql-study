@@ -9,7 +9,11 @@ const dbPass = 'phpmyadmin';
 const database = new Sequelize(dbName, dbId, dbPass, {
 	host: 'localhost',
 	dialect: 'mysql',
-	port: '3306'
+	port: '3306',
+	pool: {
+		min: 0,
+		max: 1000
+	}
 });
 // ====================================================
 
